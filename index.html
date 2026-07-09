@@ -1,0 +1,753 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>БИЛКА — Домашен билков справочник</title>
+<meta name="description" content="Домашен справочник за билки и народни рецепти. Търсене по билка или по оплакване. Работи офлайн.">
+<style>
+:root{
+  --paper:#FDFBF6;
+  --ink:#22301F;
+  --green:#2E5B34;
+  --green-dark:#1E4023;
+  --red:#A8322D;
+  --gold:#B77F24;
+  --line:#E4DECE;
+  --card:#FFFFFF;
+  --warn-bg:#FBF0EF;
+  --recipe-bg:#F3F6EF;
+  --fs:17px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{font-size:var(--fs)}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  background:var(--paper);color:var(--ink);line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+.serif{font-family:Georgia,"Times New Roman",serif}
+mark{background:#F5E3B3;color:inherit;border-radius:3px;padding:0 2px}
+
+/* Шевица — български бродиран мотив, чист CSS */
+.shevitsa{
+  height:14px;
+  background:
+    linear-gradient(45deg, var(--red) 25%, transparent 25%, transparent 75%, var(--red) 75%),
+    linear-gradient(-45deg, var(--red) 25%, transparent 25%, transparent 75%, var(--red) 75%);
+  background-size:14px 14px;
+  background-color:var(--green-dark);
+}
+
+header{
+  background:var(--green-dark);color:#F6F2E6;
+  padding:1rem 1rem .8rem;text-align:center;
+}
+header h1{font-family:Georgia,serif;font-size:2rem;letter-spacing:.18em;font-weight:700}
+header p{font-size:.8rem;opacity:.85;margin-top:.1rem}
+
+.topbar{
+  position:sticky;top:0;z-index:50;background:var(--paper);
+  border-bottom:2px solid var(--line);
+  padding:.7rem .9rem .6rem;
+}
+.searchwrap{position:relative}
+#search{
+  width:100%;font-size:1.05rem;padding:.7rem 2.8rem .7rem 1rem;
+  border:2px solid var(--green);border-radius:14px;background:#fff;color:var(--ink);
+  outline:none;
+}
+#search:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(183,127,36,.25)}
+#clearbtn{
+  position:absolute;right:.4rem;top:50%;transform:translateY(-50%);
+  border:none;background:var(--line);color:var(--ink);
+  width:2rem;height:2rem;border-radius:50%;font-size:1.05rem;cursor:pointer;display:none;
+}
+.tabs{display:flex;gap:.5rem;margin-top:.6rem}
+.tab{
+  flex:1;padding:.55rem .3rem;font-size:.95rem;font-weight:700;
+  border:2px solid var(--green);border-radius:12px;background:#fff;color:var(--green);
+  cursor:pointer;text-align:center;transition:background .15s,color .15s;
+}
+.tab.active{background:var(--green);color:#fff}
+.tab.fav{flex:0 0 auto;padding:.55rem .8rem;border-color:var(--gold);color:var(--gold)}
+.tab.fav.active{background:var(--gold);color:#fff}
+.fontbtn{
+  flex:0 0 auto;padding:.55rem .7rem;font-weight:700;border:2px solid #9aa08a;
+  border-radius:12px;background:#fff;color:#6b705c;cursor:pointer;font-size:.95rem;
+}
+main{max-width:680px;margin:0 auto;padding:.9rem .9rem 4rem}
+
+.count{font-size:.85rem;color:#6b705c;margin:.2rem 0 .6rem}
+
+/* Билка на деня */
+.today{
+  background:linear-gradient(135deg,#F3F6EF,#EDE9DB);
+  border:2px solid var(--gold);border-radius:16px;
+  padding:.9rem 1rem;margin-bottom:.9rem;cursor:pointer;
+  display:flex;gap:.9rem;align-items:center;
+}
+.today .badge{font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--gold);font-weight:800}
+.today h3{font-family:Georgia,serif;font-size:1.25rem;color:var(--green-dark)}
+.today p{font-size:.9rem;color:#55604d}
+.today img{width:64px;height:64px;border-radius:50%;object-fit:cover;border:2px solid var(--gold);flex:0 0 auto}
+
+/* Списък билки */
+.herb-card{
+  background:var(--card);border:1.5px solid var(--line);border-radius:16px;
+  padding:.8rem .9rem;margin-bottom:.65rem;cursor:pointer;
+  display:flex;gap:.8rem;align-items:center;
+  transition:border-color .15s, transform .12s;
+  animation:rise .25s ease both;
+}
+@keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.herb-card:hover,.herb-card:focus-visible{border-color:var(--green)}
+.herb-card:active{transform:scale(.985)}
+.herb-card .txt{flex:1;min-width:0}
+.herb-card h3{font-family:Georgia,serif;font-size:1.15rem;color:var(--green-dark);display:flex;align-items:center;gap:.35rem}
+.herb-card h3 .star{color:var(--gold);font-size:.9rem}
+.herb-card .lat{font-style:italic;font-size:.82rem;color:#7a7f6a}
+.herb-card .uses{font-size:.9rem;margin-top:.2rem;color:#4a5442}
+.herb-card img{
+  width:60px;height:60px;border-radius:12px;object-fit:cover;flex:0 0 auto;
+  border:1.5px solid var(--line);background:#EEF2E6;
+}
+
+/* Оплаквания — акордеон */
+.ail-card{
+  background:var(--card);border:1.5px solid var(--line);border-radius:16px;
+  margin-bottom:.65rem;overflow:hidden;
+}
+.ail-head{
+  width:100%;display:flex;align-items:center;gap:.6rem;
+  padding:.85rem 1rem;background:none;border:none;cursor:pointer;
+  font-size:1.05rem;font-family:Georgia,serif;color:var(--red);font-weight:700;text-align:left;
+}
+.ail-head .arrow{margin-left:auto;color:#9aa08a;transition:transform .2s;font-size:.9rem}
+.ail-card.open .arrow{transform:rotate(90deg)}
+.ail-body{display:none;padding:0 1rem .9rem}
+.ail-card.open .ail-body{display:block;animation:rise .2s ease both}
+.ail-body .desc{font-size:.88rem;color:#6b705c;margin-bottom:.55rem}
+.chips{display:flex;flex-wrap:wrap;gap:.45rem}
+.chip{
+  border:1.5px solid var(--green);color:var(--green-dark);background:#fff;
+  border-radius:999px;padding:.35rem .8rem;font-size:.92rem;font-weight:600;cursor:pointer;
+  transition:background .15s,color .15s;
+}
+.chip:hover{background:var(--green);color:#fff}
+
+/* Детайл на билка */
+#detail{display:none;animation:rise .25s ease both}
+.dtop{display:flex;justify-content:space-between;align-items:center;margin-bottom:.9rem;gap:.6rem}
+.backbtn{
+  display:inline-flex;align-items:center;gap:.4rem;
+  border:2px solid var(--green);background:#fff;color:var(--green-dark);
+  font-size:.95rem;font-weight:700;padding:.5rem 1rem;border-radius:12px;cursor:pointer;
+}
+.favbtn{
+  border:2px solid var(--gold);background:#fff;color:var(--gold);
+  font-size:.95rem;font-weight:700;padding:.5rem .9rem;border-radius:12px;cursor:pointer;
+  transition:background .15s,color .15s;
+}
+.favbtn.on{background:var(--gold);color:#fff}
+.dphoto{
+  width:100%;max-height:230px;object-fit:cover;border-radius:16px;
+  border:1.5px solid var(--line);margin-bottom:.9rem;background:#EEF2E6;
+}
+.dhead h2{font-family:Georgia,serif;font-size:1.6rem;color:var(--green-dark);line-height:1.25}
+.dhead .lat{font-style:italic;color:#7a7f6a;font-size:.92rem}
+.dhead .folk{font-size:.88rem;color:#6b705c;margin-top:.15rem}
+.section{margin-top:1rem}
+.section h4{
+  font-size:.8rem;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--gold);margin-bottom:.3rem;font-weight:800;
+}
+.section p, .section li{font-size:.98rem}
+.section ul{padding-left:1.2rem}
+.recipe{background:var(--recipe-bg);border:1.5px solid #CBD8C0;border-radius:14px;padding:.9rem 1rem}
+.recipe h4{color:var(--green)}
+.warn{background:var(--warn-bg);border:1.5px solid #E3B8B5;border-radius:14px;padding:.9rem 1rem}
+.warn h4{color:var(--red)}
+.tagrow{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.8rem}
+.tag{background:#EEF2E6;color:var(--green-dark);border-radius:999px;padding:.25rem .7rem;font-size:.82rem;font-weight:600;border:none;cursor:pointer}
+.tag:hover{background:var(--green);color:#fff}
+.navrow{display:flex;justify-content:space-between;gap:.6rem;margin-top:1.4rem}
+.navrow button{
+  flex:1;border:1.5px solid var(--line);background:#fff;border-radius:12px;
+  padding:.55rem;font-size:.88rem;color:var(--green-dark);cursor:pointer;font-weight:600;
+}
+
+.empty{text-align:center;color:#6b705c;padding:2.5rem 1rem;font-size:.95rem}
+
+#totop{
+  position:fixed;right:1rem;bottom:1.2rem;z-index:60;display:none;
+  width:2.9rem;height:2.9rem;border-radius:50%;border:none;cursor:pointer;
+  background:var(--green);color:#fff;font-size:1.2rem;box-shadow:0 3px 10px rgba(0,0,0,.25);
+}
+
+footer{
+  max-width:680px;margin:0 auto;padding:1.2rem .9rem 2.5rem;
+  font-size:.82rem;color:#6b705c;border-top:2px solid var(--line);
+}
+footer strong{color:var(--red)}
+
+body.big{--fs:21px}
+
+@media (prefers-reduced-motion: reduce){
+  *{transition:none!important;animation:none!important}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>БИЛКА</h1>
+  <p>Домашен билков справочник · работи без интернет</p>
+</header>
+<div class="shevitsa" aria-hidden="true"></div>
+
+<div class="topbar">
+  <div class="searchwrap">
+    <input id="search" type="search" placeholder="Търси билка или оплакване…" autocomplete="off" aria-label="Търсене по билка или оплакване">
+    <button id="clearbtn" aria-label="Изчисти търсенето">✕</button>
+  </div>
+  <div class="tabs">
+    <button class="tab active" id="tabHerbs">🌿 Билки</button>
+    <button class="tab" id="tabAils">🤒 Оплаквания</button>
+    <button class="tab fav" id="tabFavs" title="Любими">★</button>
+    <button class="fontbtn" id="fontbtn" title="По-едри букви" aria-label="По-едри букви">А+</button>
+  </div>
+</div>
+
+<main>
+  <div id="listview">
+    <div id="todaybox"></div>
+    <p class="count" id="count"></p>
+    <div id="results"></div>
+  </div>
+  <div id="detail" aria-live="polite"></div>
+</main>
+
+<button id="totop" aria-label="Към началото">↑</button>
+
+<footer>
+  <p><strong>Важно:</strong> Тази информация е само образователна и не замества преглед при лекар. Билките могат да взаимодействат с лекарства. Ако приемате лекарства, имате хронично заболяване, предстои ви операция, или сте бременна/кърмите — първо се посъветвайте с лекар или фармацевт. При спешни и тежки състояния потърсете медицинска помощ веднага.</p>
+  <p style="margin-top:.6rem">Дозировките следват монографиите на Европейската агенция по лекарствата (EMA/HMPC) и утвърдени билкови справочници. Купувайте билки от аптека или проверен билкар — не берете растения, които не познавате със сигурност. Снимките са ориентировъчни и се показват при връзка с интернет или ако папка img/ е налична.</p>
+</footer>
+
+<script>
+// ================= ДАННИ =================
+// id: име на снимка img/<id>.jpg; prep: рецепта; dose: колко и кога; warn: внимание; ail: ключове на оплаквания
+const HERBS = [
+{id:"laika", n:"Лайка", lat:"Matricaria chamomilla", folk:"камилика, подрумче",
+ what:"Най-универсалната домашна билка — успокоява стомаха, възпаленията и кожата.",
+ uses:["стомашни болки и спазми","подуване и газове","възпалено гърло (гаргара)","възпалена кожа и ранички (компрес)","леко безсъние"],
+ prep:"Чай: 1 пълна супена лъжица цвят на 250 мл вряла вода. Покрийте и оставете 10 минути, прецедете. За гаргара и компреси — същата запарка, охладена до хладка.",
+ dose:"По 1 чаша 3 пъти дневно, между храненията. Гаргара — 3–4 пъти дневно.",
+ warn:"Рядко алергия при чувствителност към сложноцветни (амброзия, хризантеми). Иначе една от най-безопасните билки.",
+ ail:["стомах","газове","гърло","кожа","сън"]},
+
+{id:"menta", n:"Мента (лютива)", lat:"Mentha piperita", folk:"джоджен (градинска мента е друг вид)",
+ what:"Класика при храносмилателни оплаквания — отпуска стомаха и премахва подуването.",
+ uses:["тежест след хранене","подуване и газове","гадене","раздразнено черво"],
+ prep:"Чай: 1–2 чаени лъжички сушен лист на 250 мл вряла вода, покрито 10 минути.",
+ dose:"По 1 чаша до 3 пъти дневно, за предпочитане след хранене.",
+ warn:"Избягвайте при силни киселини и рефлукс (може да ги засили) и при камъни в жлъчката без консултация с лекар.",
+ ail:["стомах","газове","гадене"]},
+
+{id:"matochina", n:"Маточина", lat:"Melissa officinalis", folk:"лимонче, пчелник",
+ what:"Мека успокояваща билка с лимонов аромат — за нерви, сън и нервен стомах.",
+ uses:["напрежение и безпокойство","трудно заспиване","нервен стомах","сърцебиене от притеснение"],
+ prep:"Чай: 1–2 чаени лъжички лист на 250 мл вряла вода, покрито 10 минути.",
+ dose:"По 1 чаша 2–3 пъти дневно; за сън — 1 чаша 30–40 минути преди лягане.",
+ warn:"Много добре поносима. При лекарства за щитовидна жлеза — посъветвайте се с лекар при продължителна употреба.",
+ ail:["сън","нерви","стомах"]},
+
+{id:"valeriana", n:"Валериана (дилянка)", lat:"Valeriana officinalis", folk:"котешка билка",
+ what:"Най-проученото билково средство за сън — действа най-добре при редовен прием.",
+ uses:["безсъние","трудно заспиване","нервно напрежение"],
+ prep:"Чай: 1 чаена лъжичка ситно нарязан корен на 250 мл вряла вода, покрито 10–15 минути. Още по-удобни са готовите капки или таблетки от аптеката.",
+ dose:"1 чаша 30–60 минути преди лягане. Пълният ефект идва след 2 седмици редовна употреба.",
+ warn:"Не комбинирайте с приспивателни и успокоителни лекарства и с алкохол. Може да предизвика сънливост — внимавайте при шофиране.",
+ ail:["сън","нерви"]},
+
+{id:"kantarion", n:"Жълт кантарион", lat:"Hypericum perforatum", folk:"звъника",
+ what:"Традиционно средство при потиснато настроение и външно (масло) при изгаряния и рани. Вътрешно — само след проверка на лекарствата, които приемате!",
+ uses:["леко потиснато настроение","есенна умора","кантарионово масло — външно при леки изгаряния и рани"],
+ prep:"Чай: 2 чаени лъжички на 250 мл вряла вода, 10 минути. Масло: пресен цвят се залива със зехтин и стои на слънце 3–4 седмици.",
+ dose:"По 1 чаша 2 пъти дневно. Ефектът върху настроението идва след 2–4 седмици.",
+ warn:"ВНИМАНИЕ: взаимодейства с много лекарства и намалява действието им — антидепресанти, лекарства за разреждане на кръвта, за сърце, за кръвно, противозачатъчни и други. Ако приемате каквито и да е лекарства — задължително питайте лекар/фармацевт. Прави кожата чувствителна към слънце.",
+ ail:["настроение","кожа"]},
+
+{id:"glog", n:"Глог", lat:"Crataegus monogyna / laevigata", folk:"боже дръвце",
+ what:"Билката на сърцето — подкрепя сърдечната дейност и леко смъква кръвното при продължителна употреба.",
+ uses:["леко повишено кръвно","сърцебиене от напрежение","подкрепа на сърцето при възрастни"],
+ prep:"Чай: 1–2 чаени лъжички цвят с листа (или счукани плодове) на 250 мл вряла вода, покрито 15 минути.",
+ dose:"По 1 чаша 2–3 пъти дневно, всеки ден. Ефектът се усеща след 4–6 седмици редовна употреба.",
+ warn:"При диагностицирано сърдечно заболяване или лекарства за сърце/кръвно — ползвайте само след разговор с кардиолога. Глогът допълва, но не заменя лекарствата за кръвно.",
+ ail:["сърце","кръвно"]},
+
+{id:"shipka", n:"Шипка", lat:"Rosa canina", folk:"дива роза",
+ what:"Най-богатият ни природен източник на витамин C — за имунитет и тонус през зимата.",
+ uses:["укрепване на имунитета","възстановяване след боледуване","обща отпадналост"],
+ prep:"2–3 супени лъжици счукани плодове на 500 мл вода. Ври само 5 минути на тих огън (дългото варене унищожава витамин C) или се запарва в термос за една нощ.",
+ dose:"По 1 чаша 2–3 пъти дневно, може подсладена с мед.",
+ warn:"Много безопасна. Прецеждайте през гъста цедка или марля — власинките от семките дразнят гърлото.",
+ ail:["имунитет","простуда","тонус"]},
+
+{id:"lipa", n:"Липа", lat:"Tilia cordata / platyphyllos", folk:"липов цвят",
+ what:"Първа помощ при настинка — гореща липа кара тялото да се изпоти и облекчава температурата.",
+ uses:["настинка и грип","температура (потогонно)","суха кашлица","неспокойствие"],
+ prep:"Чай: 1–2 чаени лъжички цвят на 250 мл вряла вода, покрито 10 минути.",
+ dose:"При простуда: 1 голяма чаша гореща, с мед и лимон, 2–3 пъти дневно, най-добре преди лягане под завивка.",
+ warn:"Безопасна билка за ежедневна употреба.",
+ ail:["простуда","температура","кашлица","сън"]},
+
+{id:"baz", n:"Бъз (черен)", lat:"Sambucus nigra", folk:"свирчина",
+ what:"Цветът на бъза е класическо потогонно средство при простуда и грип.",
+ uses:["настинка и грип","температура","запушен нос и синузит"],
+ prep:"Чай: 2 чаени лъжички сушен цвят на 250 мл вряла вода, покрито 10 минути.",
+ dose:"По 1 гореща чаша 2–3 пъти дневно при простуда.",
+ warn:"Използвайте само цвета (и топлинно обработени зрели плодове — сироп, мармалад). Сурови плодове, листа и кора предизвикват гадене и повръщане.",
+ ail:["простуда","температура"]},
+
+{id:"mashterka", n:"Мащерка", lat:"Thymus serpyllum / vulgaris", folk:"бабина душица",
+ what:"Първата билка при кашлица — разредява секрета и успокоява дразненето.",
+ uses:["кашлица с храчки","бронхит","дразнеща кашлица","възпалено гърло"],
+ prep:"Чай: 1–2 чаени лъжички на 250 мл вряла вода, покрито 10 минути. Задължително с мед — усилва действието при кашлица.",
+ dose:"По 1 чаша 3 пъти дневно, докато трае кашлицата.",
+ warn:"Безопасна в чаени дози. Кашлица, която не отзвучава за 2 седмици, задух или кръв в храчките — веднага на лекар.",
+ ail:["кашлица","гърло","простуда"]},
+
+{id:"zhivovlyak", n:"Живовляк (теснолист)", lat:"Plantago lanceolata", folk:"жиловлек, петопръстник",
+ what:"Двойна билка: чай при суха кашлица и жив лист върху ожулвания и ухапвания.",
+ uses:["суха дразнеща кашлица","възпалено гърло","ожулвания, ухапвания от насекоми (пресен лист)"],
+ prep:"Чай: 1–2 чаени лъжички сушен лист на 250 мл вряла вода, 10 минути, с мед. Външно: добре измит пресен лист се намачква и слага върху раничката.",
+ dose:"По 1 чаша 3 пъти дневно.",
+ warn:"Безопасна билка. Външно — само върху чиста, повърхностна рана.",
+ ail:["кашлица","гърло","кожа"]},
+
+{id:"salvia", n:"Градински чай (салвия)", lat:"Salvia officinalis", folk:"какула",
+ what:"Най-доброто билково средство за гаргара при болно гърло; спира и нощното изпотяване.",
+ uses:["болно гърло и възпалени венци (гаргара)","афти в устата","прекомерно потене"],
+ prep:"Запарка: 1 чаена лъжичка на 250 мл вряла вода, покрито 10 минути. За гаргара — хладка.",
+ dose:"Гаргара 3–4 пъти дневно. Вътрешно — по 1 чаша до 2 пъти дневно, не повече от 1–2 седмици без прекъсване.",
+ warn:"Да не се приема вътрешно продължително и във високи дози (съдържа туйон). Не при бременност и епилепсия. Гаргарата е безопасна.",
+ ail:["гърло","потене"]},
+
+{id:"neven", n:"Невен", lat:"Calendula officinalis", folk:"жълтурче",
+ what:"Кралят на кожните билки — за рани, напукана кожа и възпаления, най-често като мехлем.",
+ uses:["бавнозарастващи ранички","напукана и суха кожа","леки изгаряния","възпалена кожа"],
+ prep:"Запарка за промивки/компреси: 1–2 чаени лъжички цвят на 250 мл вряла вода, 10 минути, охладена. Най-практично: готов невенов мехлем от аптеката.",
+ dose:"Компрес или намазване 2–3 пъти дневно върху чиста кожа.",
+ warn:"Рядко алергия при чувствителност към сложноцветни. Дълбоки и гноящи рани — на лекар.",
+ ail:["кожа","рани"]},
+
+{id:"lavandula", n:"Лавандула", lat:"Lavandula angustifolia", folk:"—",
+ what:"Ароматна успокояваща билка — за неспокойни вечери и по-лек сън.",
+ uses:["безпокойство и напрежение","трудно заспиване","главоболие от напрежение"],
+ prep:"Чай: 1 чаена лъжичка цвят на 250 мл вряла вода, 10 минути. Или торбичка сушен цвят до възглавницата; няколко капки етерично масло в аромалампа.",
+ dose:"1 чаша вечер, 30 минути преди лягане.",
+ warn:"Етеричното масло не се приема вътрешно и не се нанася неразредено върху кожата.",
+ ail:["сън","нерви"]},
+
+{id:"kopriva", n:"Коприва", lat:"Urtica dioica", folk:"жарика",
+ what:"Пролетен тоник, богат на минерали — подкрепя ставите, пикочните пътища и кръвта.",
+ uses:["ставни болки (подкрепящо)","промивно при пикочни инфекции","пролетно пречистване","отпадналост и ниско желязо (подкрепящо)"],
+ prep:"Чай: 2 чаени лъжички лист на 250 мл вряла вода, 10 минути. Млада коприва — и като супа или пюре.",
+ dose:"По 1 чаша 3 пъти дневно, с достатъчно вода през деня.",
+ warn:"При отоци от сърдечна или бъбречна недостатъчност промивните чайове са забранени — питайте лекар.",
+ ail:["стави","пикочни","тонус"]},
+
+{id:"gluharche", n:"Глухарче", lat:"Taraxacum officinale", folk:"радика",
+ what:"Горчива билка за жлъчка, черен дроб и мързеливо храносмилане.",
+ uses:["тежко храносмилане","слаб апетит","подкрепа на жлъчка и черен дроб"],
+ prep:"Отвара: 1 супена лъжица нарязан корен на 250 мл вода, ври 3–5 минути, прецежда се. Млади листа — в салата.",
+ dose:"По 1 чаша 2–3 пъти дневно, 20–30 минути преди хранене.",
+ warn:"Не при запушени жлъчни пътища, камъни в жлъчката с кризи или язва в обострен стадий — първо консултация.",
+ ail:["стомах","жлъчка","апетит"]},
+
+{id:"ravnets", n:"Бял равнец", lat:"Achillea millefolium", folk:"хайдушка трева, посечена трева",
+ what:"Горчиво-ароматна билка при стомашни спазми и слаб апетит; народно средство и за рани.",
+ uses:["стомашни спазми","слаб апетит","подуване","леки ранички (външно)"],
+ prep:"Чай: 1–2 чаени лъжички на 250 мл вряла вода, покрито 10 минути.",
+ dose:"По 1 чаша 2–3 пъти дневно, преди хранене при слаб апетит.",
+ warn:"Възможна алергия при чувствителност към сложноцветни. Не при бременност.",
+ ail:["стомах","апетит","газове","рани"]},
+
+{id:"ehinatseya", n:"Ехинацея", lat:"Echinacea purpurea", folk:"—",
+ what:"Имуностимулатор — най-полезна при първите признаци на настинка, за скъсяване на боледуването.",
+ uses:["първи симптоми на настинка","чести простуди","подкрепа на имунитета"],
+ prep:"Най-надеждни са готовите капки/таблетки от аптеката (стандартизирани). Чай: 1 чаена лъжичка на 250 мл, 10 минути.",
+ dose:"Започнете при първите симптоми, приемайте до 10 дни. Не се приема постоянно с месеци.",
+ warn:"Не при автоимунни заболявания, туберкулоза, левкози и при лекарства, потискащи имунитета. Възможна алергия към сложноцветни.",
+ ail:["имунитет","простуда"]},
+
+{id:"dzhindzhifil", n:"Джинджифил", lat:"Zingiber officinale", folk:"—",
+ what:"Най-доброто природно средство против гадене; стопля и подкрепя храносмилането.",
+ uses:["гадене и прилошаване при пътуване","тежест в стомаха","настинка с втрисане"],
+ prep:"3–4 тънки резена пресен корен на чаша вряла вода, покрито 10 минути, с мед и лимон.",
+ dose:"По 1 чаша 2–3 пъти дневно; при пътна болест — 30 минути преди тръгване.",
+ warn:"При лекарства за разреждане на кръвта и камъни в жлъчката — консултирайте се. Високи дози може да раздразнят стомаха.",
+ ail:["гадене","стомах","простуда"]},
+
+{id:"len", n:"Лен (семе)", lat:"Linum usitatissimum", folk:"ленено семе",
+ what:"Мекото решение при запек — набъбва и подпомага червата, без да дразни.",
+ uses:["хроничен запек","раздразнено черво","гастрит (лигавото вещество обвива стомаха)"],
+ prep:"1 супена лъжица цяло или едро счукано семе се залива със 150 мл вода. Изпива се с още 1–2 чаши вода.",
+ dose:"2–3 пъти дневно. ЗАДЪЛЖИТЕЛНО с много течности — иначе ефектът е обратен. Действието идва след 1–3 дни.",
+ warn:"Не при стеснение на хранопровода или червата и при чревна непроходимост. Приемайте лекарствата си поне 1–2 часа преди или след лененото семе (може да забави усвояването им).",
+ ail:["запек","стомах"]},
+
+{id:"mecho-grozde", n:"Мечо грозде", lat:"Arctostaphylos uva-ursi", folk:"мечо ухо",
+ what:"Специалистът при цистит — антисептик за пикочните пътища, за кратки курсове.",
+ uses:["цистит и парене при уриниране","възпаление на пикочните пътища"],
+ prep:"Студен извлек (щади стомаха): 1–2 чаени лъжички лист се накисват в 250 мл студена вода за 6–8 часа, прецежда се и се затопля леко.",
+ dose:"По 1 чаша до 4 пъти дневно, максимум 1 седмица. Не повече от 5 курса годишно.",
+ warn:"Не при бременност, кърмене, деца и бъбречни заболявания. Ако до 3–4 дни няма подобрение, има температура или болки в кръста — веднага на лекар (рискът е инфекцията да тръгне към бъбреците).",
+ ail:["пикочни"]},
+
+{id:"tsarevichna-kosa", n:"Царевична коса", lat:"Zea mays (stigmata)", folk:"царевична свила",
+ what:"Меко промивно средство за пикочните пътища и подкрепа на жлъчката.",
+ uses:["промивно при леки пикочни оплаквания","задържане на вода","подкрепа на жлъчката"],
+ prep:"Запарка: 1–2 супени лъжици на 250 мл вряла вода, покрито 10–15 минути.",
+ dose:"По 1 чаша 2–3 пъти дневно, с достатъчно вода.",
+ warn:"При отоци от сърдечна или бъбречна недостатъчност — само след разговор с лекар.",
+ ail:["пикочни"]},
+
+{id:"rozmarin", n:"Розмарин", lat:"Rosmarinus officinalis", folk:"—",
+ what:"Ободряваща билка — при отпадналост, ниско кръвно и мързеливо храносмилане.",
+ uses:["умора и отпадналост","ниско кръвно","тежко храносмилане"],
+ prep:"Чай: 1 чаена лъжичка на 250 мл вряла вода, покрито 10 минути.",
+ dose:"По 1 чаша сутрин и на обед. Вечер не — може да пречи на съня.",
+ warn:"Не във високи дози при бременност. При високо кръвно — умерено.",
+ ail:["тонус","кръвно","стомах"]},
+
+{id:"byal-tran", n:"Бял трън", lat:"Silybum marianum", folk:"магарешки бодил (лечебен)",
+ what:"Билката за черния дроб — силимаринът в семената подпомага чернодробните клетки.",
+ uses:["подкрепа на черния дроб","възстановяване след прекарано чернодробно натоварване","тежест след мазни храни"],
+ prep:"Действащото вещество се разтваря слабо във вода, затова чаят е слаб вариант. По-добре: 1 чаена лъжичка прясно смлени семена 2–3 пъти дневно с храната, или стандартизирани капсули от аптеката.",
+ dose:"Курс от поне 4–6 седмици.",
+ warn:"При установено чернодробно заболяване билката е подкрепа, не лечение — води се от лекаря си.",
+ ail:["жлъчка","стомах"]},
+
+{id:"pelin", n:"Пелин", lat:"Artemisia absinthium", folk:"див пелин",
+ what:"Много горчива билка — събужда апетита и лениво храносмилане. В малки дози и за кратко.",
+ uses:["слаб апетит","мързеливо храносмилане","тежест в стомаха"],
+ prep:"Слаба запарка: 1 чаена лъжичка на 500 мл вряла вода, 10 минути.",
+ dose:"По 50–100 мл (половин чашка) 20 минути преди хранене, до 2 седмици.",
+ warn:"Не при бременност, кърмене, епилепсия, язва в обострен стадий. Не продължително и не в силни дози (съдържа туйон).",
+ ail:["апетит","стомах"]},
+
+{id:"mursalski", n:"Мурсалски чай", lat:"Sideritis scardica", folk:"пирински чай, алиботушки чай",
+ what:"Българската планинска гордост — тонизира и помага при простуда и кашлица.",
+ uses:["простуда","кашлица и бронхит","обща отпадналост","подкрепа на имунитета"],
+ prep:"2–3 стръка (с цвета) на 500 мл вода, ври 2–3 минути и се оставя покрит още 10. С мед и лимон.",
+ dose:"По 1 чаша 2–3 пъти дневно.",
+ warn:"Безопасен. Купувайте култивиран — дивият е защитен вид.",
+ ail:["простуда","кашлица","имунитет","тонус"]},
+
+{id:"iglika", n:"Иглика", lat:"Primula veris", folk:"лечебна иглика",
+ what:"Класическо отхрачващо — разредява жилавите храчки при бронхит.",
+ uses:["кашлица със застоели храчки","бронхит"],
+ prep:"Отвара: 1 чаена лъжичка нарязан корен на 250 мл вода, ври 5 минути. Или запарка от цвят: 2 чаени лъжички на чаша.",
+ dose:"По 1 чаша 2–3 пъти дневно, с мед.",
+ warn:"Не при язва на стомаха. Възможна алергия. Диворастящата е защитена — купувайте от аптека.",
+ ail:["кашлица"]},
+
+{id:"hmel", n:"Хмел", lat:"Humulus lupulus", folk:"—",
+ what:"Сънотворните шишарки — отлични в комбинация с валериана или маточина при безсъние.",
+ uses:["безсъние","нервно напрежение","неспокоен сън"],
+ prep:"Чай: 1–2 чаени лъжички шишарки на 250 мл вряла вода, покрито 10 минути. Добре се комбинира с маточина или валериана (по равни части).",
+ dose:"1 чаша 30–45 минути преди лягане.",
+ warn:"Предизвиква сънливост — не преди шофиране. Не с приспивателни и алкохол.",
+ ail:["сън","нерви"]},
+
+{id:"pasiflora", n:"Пасифлора", lat:"Passiflora incarnata", folk:"страстниче",
+ what:"Мек растителен успокоител — сваля вътрешното напрежение, без да замайва.",
+ uses:["тревожност и вътрешно напрежение","трудно заспиване от мисли","нервно сърцебиене"],
+ prep:"Чай: 1–2 чаени лъжички на 250 мл вряла вода, покрито 10 минути.",
+ dose:"По 1 чаша 2–3 пъти дневно или 1 чаша преди лягане.",
+ warn:"Не комбинирайте с успокоителни лекарства без консултация. Възможна лека сънливост.",
+ ail:["нерви","сън"]},
+
+{id:"anason", n:"Анасон", lat:"Pimpinella anisum", folk:"анасоново семе",
+ what:"Ароматно семе против газове и за по-лесно откашляне.",
+ uses:["газове и подуване","колики","кашлица (отхрачващо)","лош дъх"],
+ prep:"Чай: 1 чаена лъжичка счукани непосредствено преди това семена на 250 мл вряла вода, покрито 10 минути.",
+ dose:"По 1 чаша след хранене, 2–3 пъти дневно.",
+ warn:"Рядко алергия. Безопасен в чаени дози.",
+ ail:["газове","кашлица","стомах"]},
+
+{id:"rezene", n:"Резене (копър сладък)", lat:"Foeniculum vulgare", folk:"морач",
+ what:"Най-мекото средство при подуване и газове — традиционно и при бебешки колики (само след консултация с педиатър).",
+ uses:["газове и подуване","стомашни спазми","колики"],
+ prep:"Чай: 1–2 чаени лъжички счукани семена на 250 мл вряла вода, покрито 10 минути.",
+ dose:"По 1 чаша след хранене, до 3 пъти дневно.",
+ warn:"Безопасно в чаени дози за възрастни. За кърмачета и малки деца — само след разговор с педиатър.",
+ ail:["газове","стомах"]},
+
+{id:"cheren-oman", n:"Черен оман", lat:"Symphytum officinale", folk:"зарасличе",
+ what:"САМО ВЪНШНО: компреси и мехлеми при натъртвания, навяхвания и ставни болки.",
+ uses:["натъртвания и навяхвания","болки в ставите и мускулите","болки в кръста (външно)"],
+ prep:"Най-практично: готов мехлем/гел от аптеката. Домашно: кашица от настърган пресен корен върху марля като компрес за 1–2 часа.",
+ dose:"Намазване/компрес 2–3 пъти дневно, до 10 дни подред, върху здрава кожа.",
+ warn:"НИКОГА вътрешно (уврежда черния дроб). Не върху отворени рани и наранена кожа. Не при бременност и кърмене.",
+ ail:["стави","рани"]},
+
+{id:"varbova-kora", n:"Върбова кора", lat:"Salix (кора)", folk:"природният аспирин",
+ what:"Съдържа салицин — предшественика на аспирина. При болки в кръста, ставите и главата.",
+ uses:["болки в кръста","ставни болки","главоболие","температура"],
+ prep:"Отвара: 1–2 чаени лъжички нарязана кора на 250 мл вода, ври 5 минути, покрито още 10.",
+ dose:"По 1 чаша 2–3 пъти дневно, след хранене.",
+ warn:"Все едно приемате лек аспирин: не при алергия към аспирин, язва, лекарства за разреждане на кръвта, астма от аспирин. Не за деца и юноши при вирусни заболявания. Не при бременност.",
+ ail:["стави","болки","температура"]},
+
+{id:"borovinka", n:"Черна боровинка (плод)", lat:"Vaccinium myrtillus", folk:"—",
+ what:"Сушените плодове са изпитано средство при разстройство; пресните действат обратно (леко разхлабващо).",
+ uses:["диария и разстройство (сушен плод)","подкрепа на очите и дребните съдове"],
+ prep:"Отвара: 1–2 супени лъжици СУШЕНИ плодове на 250 мл вода, ври 10 минути. Или се дъвчат по 1–2 супени лъжици сушени плодове.",
+ dose:"По 1 чаша 2–3 пъти дневно при разстройство.",
+ warn:"Диария повече от 2–3 дни, с температура или кръв, особено при възрастни хора — веднага на лекар (опасност от обезводняване).",
+ ail:["диария","стомах"]},
+
+{id:"hvoyna", n:"Хвойна", lat:"Juniperus communis", folk:"смрика",
+ what:"Ароматните плодчета подпомагат храносмилането и действат промивно. Само за кратки курсове.",
+ uses:["тежко храносмилане и газове","промивно при леки пикочни оплаквания"],
+ prep:"Запарка: 1 чаена лъжичка леко счукани плодчета на 250 мл вряла вода, покрито 15 минути.",
+ dose:"По 1 чаша 1–2 пъти дневно, не повече от 2–4 седмици.",
+ warn:"НЕ при бъбречни заболявания и възпаления на бъбреците, не при бременност. Не продължително — дразни бъбреците при дълга употреба.",
+ ail:["пикочни","стомах","газове"]}
+];
+
+// ================= ОПЛАКВАНИЯ =================
+const AILMENTS = [
+{k:"простуда", t:"Настинка и грип", d:"Топли потогонни чайове, покой и течности.", icon:"🤧"},
+{k:"температура", t:"Температура", d:"Потогонни билки в подкрепа; висока температура при възрастни — мерете редовно.", icon:"🌡️"},
+{k:"кашлица", t:"Кашлица и бронхит", d:"С мед действат по-добре. Кашлица над 2 седмици — на лекар.", icon:"😮‍💨"},
+{k:"гърло", t:"Болно гърло и венци", d:"Гаргара няколко пъти дневно с хладка запарка.", icon:"🗣️"},
+{k:"имунитет", t:"Имунитет", d:"За укрепване през сезона на вирусите.", icon:"🛡️"},
+{k:"стомах", t:"Стомах и храносмилане", d:"Тежест, спазми, гастрит, лениво храносмилане.", icon:"🫃"},
+{k:"газове", t:"Газове и подуване", d:"Ветрогонни билки, най-добре след хранене.", icon:"💨"},
+{k:"гадене", t:"Гадене", d:"Включително прилошаване при пътуване.", icon:"🤢"},
+{k:"запек", t:"Запек", d:"Меки набъбващи средства + много вода и движение.", icon:"🚻"},
+{k:"диария", t:"Разстройство", d:"Стягащи средства + много течности. Продължи ли — на лекар.", icon:"⚠️"},
+{k:"жлъчка", t:"Жлъчка и черен дроб", d:"Горчиви билки преди хранене; при камъни — първо лекар.", icon:"🫀"},
+{k:"апетит", t:"Слаб апетит", d:"Горчивите билки 20–30 минути преди хранене.", icon:"🍽️"},
+{k:"сън", t:"Безсъние", d:"Редовност и вечерен ритуал; билките действат с натрупване.", icon:"😴"},
+{k:"нерви", t:"Нерви и напрежение", d:"Меки успокоителни билки през деня.", icon:"🧘"},
+{k:"настроение", t:"Потиснато настроение", d:"При продължително униние потърсете и човешка подкрепа — билката не е всичко.", icon:"🌤️"},
+{k:"сърце", t:"Сърце", d:"Подкрепящо — редовните прегледи и лекарствата остават на първо място.", icon:"❤️"},
+{k:"кръвно", t:"Кръвно налягане", d:"Билките са допълнение към, не замяна на лечението.", icon:"🩺"},
+{k:"пикочни", t:"Пикочни пътища и цистит", d:"Много течности; без подобрение до 3–4 дни — на лекар.", icon:"💧"},
+{k:"стави", t:"Стави, мускули и кръст", d:"Вътрешно и външно (компреси, мехлеми).", icon:"🦵"},
+{k:"болки", t:"Главоболие и болки", d:"При нови, силни или необичайни болки — първо лекар.", icon:"🤕"},
+{k:"кожа", t:"Кожа", d:"Възпаления, сухота, леки изгаряния.", icon:"🖐️"},
+{k:"рани", t:"Ранички и натъртвания", d:"Само повърхностни и чисти; дълбоките — на лекар.", icon:"🩹"},
+{k:"потене", t:"Прекомерно потене", d:"Включително нощно изпотяване.", icon:"💦"},
+{k:"тонус", t:"Умора и отпадналост", d:"Тонизиращи билки, за предпочитане сутрин.", icon:"⚡"}
+];
+
+// ================= ЛОГИКА =================
+const $=id=>document.getElementById(id);
+const results=$("results"), detail=$("detail"), listview=$("listview"),
+      search=$("search"), clearbtn=$("clearbtn"), count=$("count"),
+      todaybox=$("todaybox");
+let mode="herbs";
+let openAils=new Set();
+
+// Безопасно съхранение (работи на GitHub Pages; в среди без localStorage тихо пази само за сесията)
+const store={
+  get(k){try{return localStorage.getItem(k)}catch(e){return this._m&&this._m[k]||null}},
+  set(k,v){try{localStorage.setItem(k,v)}catch(e){this._m=this._m||{};this._m[k]=v}}
+};
+let favs=new Set();
+try{favs=new Set(JSON.parse(store.get("bilka_favs")||"[]"))}catch(e){}
+function saveFavs(){store.set("bilka_favs",JSON.stringify([...favs]))}
+
+function norm(s){return s.toLowerCase().replace(/\s+/g," ").trim()}
+function esc(s){return s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
+function hl(text,q){
+  if(!q)return text;
+  const i=norm(text).indexOf(q);
+  if(i<0)return text;
+  return text.slice(0,i)+"<mark>"+text.slice(i,i+q.length)+"</mark>"+text.slice(i+q.length);
+}
+function ailTitle(k){const a=AILMENTS.find(x=>x.k===k);return a?a.t:k}
+function img(h,cls){
+  return `<img class="${cls}" src="img/${h.id}.jpg" alt="${esc(h.n)}" loading="lazy" onerror="this.style.display='none'">`;
+}
+
+function herbCard(h,i,q){
+  return `<div class="herb-card" role="button" tabindex="0" onclick="openHerb(${i})" onkeydown="if(event.key==='Enter')openHerb(${i})">
+    <div class="txt">
+      <h3>${favs.has(h.id)?'<span class="star">★</span>':''}${hl(h.n,q)}</h3>
+      <div class="lat">${hl(h.lat,q)}${h.folk&&h.folk!=="—"?" · нар. "+hl(h.folk,q):""}</div>
+      <div class="uses">${hl(h.uses.slice(0,3).join(" · "),q)}</div>
+    </div>
+    ${img(h,"")}
+  </div>`;
+}
+
+function ailCard(a,forceOpen){
+  const herbs=HERBS.map((h,i)=>({h,i})).filter(x=>x.h.ail.includes(a.k));
+  if(!herbs.length)return"";
+  const open=forceOpen||openAils.has(a.k);
+  return `<div class="ail-card ${open?"open":""}" id="ail-${a.k}">
+    <button class="ail-head" onclick="toggleAil('${a.k}')" aria-expanded="${open}">
+      <span>${a.icon}</span><span>${a.t}</span><span class="arrow">▶</span>
+    </button>
+    <div class="ail-body">
+      <p class="desc">${a.d}</p>
+      <div class="chips">${herbs.map(x=>`<button class="chip" onclick="openHerb(${x.i})">${x.h.n}</button>`).join("")}</div>
+    </div>
+  </div>`;
+}
+
+function toggleAil(k){
+  openAils.has(k)?openAils.delete(k):openAils.add(k);
+  document.getElementById("ail-"+k).classList.toggle("open");
+}
+
+function todayHerb(){
+  const d=new Date();
+  const dayN=Math.floor(d.getTime()/86400000);
+  return dayN%HERBS.length;
+}
+function renderToday(){
+  if(mode!=="herbs"||norm(search.value)){todaybox.innerHTML="";return}
+  const i=todayHerb(),h=HERBS[i];
+  todaybox.innerHTML=`<div class="today" role="button" tabindex="0" onclick="openHerb(${i})" onkeydown="if(event.key==='Enter')openHerb(${i})">
+    ${img(h,"")}
+    <div>
+      <div class="badge">Билка на деня</div>
+      <h3>${h.n}</h3>
+      <p>${h.what}</p>
+    </div>
+  </div>`;
+}
+
+function render(){
+  const q=norm(search.value);
+  clearbtn.style.display=q?"block":"none";
+  detail.style.display="none";listview.style.display="block";
+  renderToday();
+
+  if(q){
+    const hits=HERBS.map((h,i)=>({h,i})).filter(({h})=>{
+      const hay=norm([h.n,h.lat,h.folk,h.what,h.uses.join(" "),h.ail.map(ailTitle).join(" "),h.ail.join(" ")].join(" "));
+      return hay.includes(q);
+    });
+    const ailHits=AILMENTS.filter(a=>norm(a.t+" "+a.k+" "+a.d).includes(q));
+    let html="";
+    if(ailHits.length) html+=ailHits.map(a=>ailCard(a,true)).join("");
+    if(hits.length) html+=hits.map(({h,i})=>herbCard(h,i,q)).join("");
+    results.innerHTML=html||`<div class="empty">Нищо не е намерено за „${esc(search.value)}“.<br>Опитайте с друга дума — например „кашлица“, „стомах“ или „лайка“.</div>`;
+    count.textContent=hits.length?`Намерени билки: ${hits.length}`:"";
+    return;
+  }
+
+  if(mode==="herbs"){
+    results.innerHTML=HERBS.map((h,i)=>herbCard(h,i,"")).join("");
+    count.textContent=`Билки в справочника: ${HERBS.length}`;
+  }else if(mode==="favs"){
+    const list=HERBS.map((h,i)=>({h,i})).filter(x=>favs.has(x.h.id));
+    results.innerHTML=list.length
+      ? list.map(({h,i})=>herbCard(h,i,"")).join("")
+      : `<div class="empty">Нямате запазени любими билки.<br>Отворете билка и натиснете <b style="color:var(--gold)">☆ Запази</b> — тя ще се появи тук.</div>`;
+    count.textContent=list.length?`Любими билки: ${list.length}`:"";
+  }else{
+    results.innerHTML=AILMENTS.map(a=>ailCard(a,false)).join("");
+    count.textContent=`Натиснете оплакване, за да видите билките`;
+  }
+}
+
+function openHerb(i){
+  const h=HERBS[i];
+  const isFav=favs.has(h.id);
+  const prev=(i-1+HERBS.length)%HERBS.length, next=(i+1)%HERBS.length;
+  detail.innerHTML=`
+    <div class="dtop">
+      <button class="backbtn" onclick="closeDetail()">← Назад</button>
+      <button class="favbtn ${isFav?"on":""}" id="favbtn" onclick="toggleFav('${h.id}',${i})">${isFav?"★ Запазена":"☆ Запази"}</button>
+    </div>
+    ${img(h,"dphoto")}
+    <div class="dhead">
+      <h2 class="serif">${h.n}</h2>
+      <div class="lat">${h.lat}</div>
+      ${h.folk&&h.folk!=="—"?`<div class="folk">Народни имена: ${h.folk}</div>`:""}
+    </div>
+    <div class="section"><p>${h.what}</p></div>
+    <div class="section">
+      <h4>При какво помага</h4>
+      <ul>${h.uses.map(u=>`<li>${u}</li>`).join("")}</ul>
+    </div>
+    <div class="section recipe">
+      <h4>Как се приготвя</h4>
+      <p>${h.prep}</p>
+    </div>
+    <div class="section">
+      <h4>Колко и кога</h4>
+      <p>${h.dose}</p>
+    </div>
+    <div class="section warn">
+      <h4>Внимание</h4>
+      <p>${h.warn}</p>
+    </div>
+    <div class="tagrow">${h.ail.map(k=>`<button class="tag" onclick="goAil('${k}')">${ailTitle(k)}</button>`).join("")}</div>
+    <div class="navrow">
+      <button onclick="openHerb(${prev})">← ${HERBS[prev].n}</button>
+      <button onclick="openHerb(${next})">${HERBS[next].n} →</button>
+    </div>
+  `;
+  listview.style.display="none";
+  detail.style.display="block";
+  window.scrollTo({top:0});
+}
+
+function toggleFav(id,i){
+  favs.has(id)?favs.delete(id):favs.add(id);
+  saveFavs();
+  const b=$("favbtn");
+  b.classList.toggle("on",favs.has(id));
+  b.textContent=favs.has(id)?"★ Запазена":"☆ Запази";
+}
+
+function goAil(k){
+  mode="ails";setTabs();search.value="";
+  openAils.add(k);
+  render();
+  const el=document.getElementById("ail-"+k);
+  if(el)el.scrollIntoView({block:"start"});
+}
+
+function closeDetail(){
+  detail.style.display="none";
+  listview.style.display="block";
+}
+
+$("tabHerbs").onclick=()=>{mode="herbs";setTabs();search.value="";render()};
+$("tabAils").onclick=()=>{mode="ails";setTabs();search.value="";render()};
+$("tabFavs").onclick=()=>{mode="favs";setTabs();search.value="";render()};
+function setTabs(){
+  $("tabHerbs").classList.toggle("active",mode==="herbs");
+  $("tabAils").classList.toggle("active",mode==="ails");
+  $("tabFavs").classList.toggle("active",mode==="favs");
+}
+search.addEventListener("input",render);
+clearbtn.onclick=()=>{search.value="";render();search.focus()};
+$("fontbtn").onclick=()=>{
+  document.body.classList.toggle("big");
+  $("fontbtn").textContent=document.body.classList.contains("big")?"А−":"А+";
+};
+
+const totop=$("totop");
+window.addEventListener("scroll",()=>{
+  totop.style.display=window.scrollY>500?"block":"none";
+});
+totop.onclick=()=>window.scrollTo({top:0,behavior:"smooth"});
+
+render();
+</script>
+</body>
+</html>
