@@ -58,18 +58,25 @@ def main():
     titles = list(PLANTS.values())
     ok, miss = 0, []
 
-    # pageimages поддържа до 50 заглавия на заявка
-    data = api({
+    # pageimages връща thumbnail-и на порции — обхождаме с continue
+    base = {
         "action": "query", "format": "json", "redirects": 1,
         "prop": "pageimages", "piprop": "thumbnail", "pithumbsize": 640,
-        "titles": "|".join(titles),
-    })
-    # нормализации и пренасочвания -> обратно към оригиналното заглавие
-    remap = {}
-    for r in data.get("query", {}).get("normalized", []) + data.get("query", {}).get("redirects", []):
-        remap[r["to"]] = remap.get(r["from"], r["from"])
+        "pilimit": "max", "titles": "|".join(titles),
+    }
+    pages, remap, cont = {}, {}, {}
+    while True:
+        data = api({**base, **cont})
+        for r in data.get("query", {}).get("normalized", []) + data.get("query", {}).get("redirects", []):
+            remap[r["to"]] = remap.get(r["from"], r["from"])
+        for pid_, page in data.get("query", {}).get("pages", {}).items():
+            if "thumbnail" in page or pid_ not in pages:
+                pages[pid_] = page
+        cont = data.get("continue")
+        if not cont:
+            break
 
-    for page in data.get("query", {}).get("pages", {}).values():
+    for page in pages.values():
         title = page.get("title", "")
         orig = remap.get(title, title)
         pid = title_to_id.get(orig) or title_to_id.get(title)
