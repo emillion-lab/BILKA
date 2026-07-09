@@ -1,0 +1,27 @@
+name: Fetch herb images
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [fetch_images.py]
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download images from Wikipedia
+        run: python3 fetch_images.py
+
+      - name: Commit images
+        run: |
+          git config user.name "bilka-bot"
+          git config user.email "actions@github.com"
+          git add img/
+          git diff --staged --quiet || git commit -m "Add herb images from Wikipedia"
+          git push
