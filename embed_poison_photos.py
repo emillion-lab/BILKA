@@ -31,10 +31,21 @@ try:
 except ImportError:
     sys.exit("Липсва 'Pillow'.  Пусни:  pip install requests pillow")
 
+try:
+    from requests.adapters import HTTPAdapter
+    from urllib3.util.retry import Retry
+    SESSION = requests.Session()
+    _retry = Retry(total=5, connect=3, read=3, backoff_factor=1.5,
+                   status_forcelist=[403, 429, 500, 502, 503, 504],
+                   allowed_methods=["GET"], respect_retry_after_header=True)
+    SESSION.mount("https://", HTTPAdapter(max_retries=_retry))
+except Exception:
+    SESSION = requests.Session()
+
 HTML_FILE = "index.html"
 MAX_PX = 700          # най-дълга страна на снимката
 JPEG_QUALITY = 78     # компресия — по-ниско = по-малък файл
-USER_AGENT = "BILKA-herb-guide/1.0 (offline first-aid herbal; educational)"
+USER_AGENT = "BILKA-herbal/1.0 (https://github.com/emillion-lab/BILKA; educational herbal reference)"
 
 # id в приложението  ->  статия в Wikipedia (латинско име = точният вид).
 # "wiki" е езиковата версия; "title" е заглавието на статията.
@@ -60,8 +71,8 @@ RASTER = (".jpg", ".jpeg", ".png")
 
 
 def _get(url, stream=False):
-    return requests.get(url, headers={"User-Agent": USER_AGENT},
-                        timeout=45, stream=stream, allow_redirects=True)
+    return SESSION.get(url, headers={"User-Agent": USER_AGENT},
+                       timeout=60, stream=stream, allow_redirects=True)
 
 
 def _json(url):
@@ -91,47 +102,49 @@ def image_urls(wiki, title, override_file):
         fn = override_file.replace("File:", "")
         cands.append((filepath_url(fn), fn))
 
-    # 1) Wikipedia REST summary — водещата снимка на статията (точният вид)
+    # 1) pageimages — връща директния URL на водещата снимка в едно повикване
     try:
-        j = _json(f"https://{wiki}.wikipedia.org/api/rest_v1/page/summary/"
-                  + quote(title, safe=""))
-        for key in ("originalimage", "thumbnail"):
-            src = (j.get(key) or {}).get("source")
-            if src:
-                fn = unquote(src.split("/")[-1])
-                fn = re.sub(r"^\d+px-", "", fn)
-                cands.append((src, fn))
+        data = wiki_api(wiki, "action=query&prop=pageimages"
+                             "&piprop=original|thumbnail|name&pithumbsize=%d"
+                             "&titles=%s" % (MAX_PX, quote(title)))
+        for p in data.get("query", {}).get("pages", {}).values():
+            orig = (p.get("original") or {}).get("source")
+            thumb = (p.get("thumbnail") or {}).get("source")
+            name = p.get("pageimage")
+            url = thumb or orig
+            if url and name:
+                cands.append((url, name))
     except Exception:
         pass
 
     # 2) Wikidata P18 — официалната снимка на таксона
     try:
-        pp = wiki_api(wiki, f"action=query&prop=pageprops&ppprop=wikibase_item"
-                            f"&titles={quote(title)}")
+        pp = wiki_api(wiki, "action=query&prop=pageprops&ppprop=wikibase_item"
+                            "&titles=%s" % quote(title))
         qid = None
         for p in pp.get("query", {}).get("pages", {}).values():
             qid = (p.get("pageprops") or {}).get("wikibase_item")
         if qid:
-            wd = _json(f"https://www.wikidata.org/w/api.php?action=wbgetclaims"
-                       f"&entity={qid}&property=P18&format=json")
+            wd = _json("https://www.wikidata.org/w/api.php?action=wbgetclaims"
+                       "&entity=%s&property=P18&format=json" % qid)
             for c in wd.get("claims", {}).get("P18", []):
                 fn = c["mainsnak"]["datavalue"]["value"]
                 cands.append((filepath_url(fn), fn))
     except Exception:
         pass
 
-    # 3) pageimages (резерв)
+    # 3) REST summary (резерв)
     try:
-        data = wiki_api(wiki, f"action=query&prop=pageimages&piprop=name"
-                             f"&titles={quote(title)}")
-        for p in data.get("query", {}).get("pages", {}).values():
-            if p.get("pageimage"):
-                fn = p["pageimage"]
-                cands.append((filepath_url(fn), fn))
+        j = _json("https://%s.wikipedia.org/api/rest_v1/page/summary/%s"
+                  % (wiki, quote(title, safe="")))
+        for key in ("originalimage", "thumbnail"):
+            src = (j.get(key) or {}).get("source")
+            if src:
+                fn = re.sub(r"^\d+px-", "", unquote(src.split("/")[-1]))
+                cands.append((src, fn))
     except Exception:
         pass
 
-    # подреждане: реални снимки (raster) първо, без дубликати по файл
     seen, raster, other = set(), [], []
     for url, fn in cands:
         key = fn.lower()
@@ -200,7 +213,7 @@ def main():
                 break
             if not got:
                 print(f"  \u2717 {pid}: нито един кандидат не се свали за {spec['title']}")
-            time.sleep(0.4)
+            time.sleep(1.2)
         except Exception as e:
             print(f"  \u2717 {pid}: грешка \u2014 {e}")
 
