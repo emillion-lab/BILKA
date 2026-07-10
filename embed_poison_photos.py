@@ -56,114 +56,116 @@ SPECIES = {
 }
 
 
-RASTER = (".jpg", ".jpeg", ".png")  # реални снимки; пропускаме .svg/.pdf/.tif (рисунки/схеми)
+RASTER = (".jpg", ".jpeg", ".png")
 
 
-def _get(url, **params):
-    r = requests.get(url, params=params or None,
-                     headers={"User-Agent": USER_AGENT}, timeout=40)
+def _get(url, stream=False):
+    return requests.get(url, headers={"User-Agent": USER_AGENT},
+                        timeout=45, stream=stream, allow_redirects=True)
+
+
+def _json(url):
+    r = _get(url)
     r.raise_for_status()
-    return r
+    return r.json()
 
 
-def api(wiki, params):
-    return _get(f"https://{wiki}.wikipedia.org/w/api.php",
-                **dict(params, format="json")).json()
+def wiki_api(wiki, qs):
+    return _json(f"https://{wiki}.wikipedia.org/w/api.php?{qs}&format=json")
 
 
-def commons_api(params):
-    return _get("https://commons.wikimedia.org/w/api.php",
-                **dict(params, format="json")).json()
+def filepath_url(filename):
+    """Директен, надежден адрес към файла в Commons (следва редирект към thumb)."""
+    from urllib.parse import quote
+    fn = filename.replace("File:", "").strip()
+    return (f"https://commons.wikimedia.org/wiki/Special:FilePath/"
+            f"{quote(fn)}?width={MAX_PX}")
 
 
-def _file_from_url(u):
-    """От upload URL вади името File:... (последната част, декодирана)."""
-    from urllib.parse import unquote
-    name = unquote(u.split("/")[-1])
-    # маха евентуален thumb префикс "NNNpx-"
-    name = re.sub(r"^\d+px-", "", name)
-    return "File:" + name
+def image_urls(wiki, title, override_file):
+    """Списък от (директен_URL, име_на_файл) кандидати — снимки преди рисунки."""
+    from urllib.parse import quote, unquote
+    cands = []  # (url, filename)
 
-
-def candidates(wiki, title, override_file):
-    """Връща подредени кандидат-файлове (File:...) за вида, снимки преди рисунки."""
-    out = []
     if override_file:
-        out.append(override_file if override_file.startswith("File:") else "File:" + override_file)
+        fn = override_file.replace("File:", "")
+        cands.append((filepath_url(fn), fn))
 
-    # 1) Wikipedia REST summary — водещата снимка от таксобокса (точният вид)
+    # 1) Wikipedia REST summary — водещата снимка на статията (точният вид)
     try:
-        r = _get(f"https://{wiki}.wikipedia.org/api/rest_v1/page/summary/"
-                 + requests.utils.quote(title, safe=""))
-        j = r.json()
+        j = _json(f"https://{wiki}.wikipedia.org/api/rest_v1/page/summary/"
+                  + quote(title, safe=""))
         for key in ("originalimage", "thumbnail"):
             src = (j.get(key) or {}).get("source")
             if src:
-                out.append(_file_from_url(src))
+                fn = unquote(src.split("/")[-1])
+                fn = re.sub(r"^\d+px-", "", fn)
+                cands.append((src, fn))
     except Exception:
         pass
 
     # 2) Wikidata P18 — официалната снимка на таксона
     try:
-        pp = api(wiki, {"action": "query", "prop": "pageprops",
-                        "titles": title, "ppprop": "wikibase_item"})
+        pp = wiki_api(wiki, f"action=query&prop=pageprops&ppprop=wikibase_item"
+                            f"&titles={quote(title)}")
         qid = None
         for p in pp.get("query", {}).get("pages", {}).values():
             qid = (p.get("pageprops") or {}).get("wikibase_item")
         if qid:
-            wd = _get("https://www.wikidata.org/w/api.php", action="wbgetclaims",
-                      entity=qid, property="P18", format="json").json()
+            wd = _json(f"https://www.wikidata.org/w/api.php?action=wbgetclaims"
+                       f"&entity={qid}&property=P18&format=json")
             for c in wd.get("claims", {}).get("P18", []):
                 fn = c["mainsnak"]["datavalue"]["value"]
-                out.append("File:" + fn)
+                cands.append((filepath_url(fn), fn))
     except Exception:
         pass
 
     # 3) pageimages (резерв)
     try:
-        data = api(wiki, {"action": "query", "prop": "pageimages",
-                          "piprop": "name", "titles": title})
+        data = wiki_api(wiki, f"action=query&prop=pageimages&piprop=name"
+                             f"&titles={quote(title)}")
         for p in data.get("query", {}).get("pages", {}).values():
             if p.get("pageimage"):
-                out.append("File:" + p["pageimage"])
+                fn = p["pageimage"]
+                cands.append((filepath_url(fn), fn))
     except Exception:
         pass
 
-    # подреждане: реални снимки (raster) първо, без дубликати
+    # подреждане: реални снимки (raster) първо, без дубликати по файл
     seen, raster, other = set(), [], []
-    for f in out:
-        if f in seen:
+    for url, fn in cands:
+        key = fn.lower()
+        if key in seen:
             continue
-        seen.add(f)
-        (raster if f.lower().endswith(RASTER) else other).append(f)
+        seen.add(key)
+        (raster if key.endswith(RASTER) else other).append((url, fn))
     return raster + other
 
 
-def image_info(file_title):
-    """Връща (url, автор, лиценз, страница) за даден File: от Commons."""
-    data = commons_api({
-        "action": "query", "prop": "imageinfo", "titles": file_title,
-        "iiprop": "url|extmetadata", "iiurlwidth": MAX_PX,
-    })
-    pages = data.get("query", {}).get("pages", {})
-    for p in pages.values():
-        ii = p.get("imageinfo")
-        if not ii:
-            continue
-        info = ii[0]
-        url = info.get("thumburl") or info.get("url")
-        meta = info.get("extmetadata", {})
-        artist_html = (meta.get("Artist", {}) or {}).get("value", "")
-        artist = re.sub("<[^>]+>", "", artist_html).strip() or "Wikimedia Commons"
-        artist = re.sub(r"\s+", " ", artist)
-        lic = (meta.get("LicenseShortName", {}) or {}).get("value", "").strip()
-        page = info.get("descriptionshorturl") or info.get("descriptionurl") or ""
-        return url, artist, lic, page
-    return None, None, None, None
+def credit_for(filename):
+    """Best-effort автор + лиценз от Commons. Ако се провали — общ кредит."""
+    from urllib.parse import quote
+    try:
+        j = _json("https://commons.wikimedia.org/w/api.php?action=query"
+                  "&prop=imageinfo&iiprop=extmetadata|url"
+                  f"&titles=File:{quote(filename.replace('File:',''))}&format=json")
+        for p in j.get("query", {}).get("pages", {}).values():
+            ii = p.get("imageinfo")
+            if not ii:
+                continue
+            meta = ii[0].get("extmetadata", {})
+            art = re.sub("<[^>]+>", "", (meta.get("Artist", {}) or {}).get("value", "")).strip()
+            art = re.sub(r"\s+", " ", art) or "Wikimedia Commons"
+            lic = (meta.get("LicenseShortName", {}) or {}).get("value", "").strip()
+            page = ii[0].get("descriptionshorturl", "")
+            return art, lic, page
+    except Exception:
+        pass
+    return "Wikimedia Commons", "", ""
 
 
 def fetch_and_encode(url):
-    r = requests.get(url, headers={"User-Agent": USER_AGENT}, timeout=60)
+    r = _get(url)
     r.raise_for_status()
     im = Image.open(io.BytesIO(r.content))
     if im.mode not in ("RGB", "L"):
@@ -174,34 +176,31 @@ def fetch_and_encode(url):
     b64 = base64.b64encode(buf.getvalue()).decode("ascii")
     return "data:image/jpeg;base64," + b64, len(buf.getvalue())
 
-
 def main():
     photos = {}
     total = 0
     for pid, spec in SPECIES.items():
         got = False
         try:
-            cands = candidates(spec["wiki"], spec["title"], spec.get("file"))
+            cands = image_urls(spec["wiki"], spec["title"], spec.get("file"))
             if not cands:
                 print(f"  \u2717 {pid}: нямам кандидат за {spec['title']}")
                 continue
-            for file_title in cands:
+            for url, fn in cands:
                 try:
-                    url, artist, lic, page = image_info(file_title)
-                    if not url:
-                        continue
                     data_uri, nbytes = fetch_and_encode(url)
-                    photos[pid] = {"src": data_uri, "credit": artist,
-                                   "license": lic, "source": page}
-                    total += nbytes
-                    print(f"  \u2713 {pid}: {spec['title']}  ({nbytes // 1024} KB)  \u2014 {artist[:45]}, {lic}")
-                    got = True
-                    break
                 except Exception:
                     continue
+                artist, lic, page = credit_for(fn)
+                photos[pid] = {"src": data_uri, "credit": artist,
+                               "license": lic, "source": page}
+                total += nbytes
+                print(f"  \u2713 {pid}: {spec['title']}  ({nbytes // 1024} KB)  \u2014 {artist[:45]}, {lic}")
+                got = True
+                break
             if not got:
                 print(f"  \u2717 {pid}: нито един кандидат не се свали за {spec['title']}")
-            time.sleep(0.5)
+            time.sleep(0.4)
         except Exception as e:
             print(f"  \u2717 {pid}: грешка \u2014 {e}")
 
