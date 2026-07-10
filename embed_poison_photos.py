@@ -56,34 +56,87 @@ SPECIES = {
 }
 
 
-def api(wiki, params):
-    url = f"https://{wiki}.wikipedia.org/w/api.php"
-    params = dict(params, format="json")
-    r = requests.get(url, params=params, headers={"User-Agent": USER_AGENT}, timeout=30)
+RASTER = (".jpg", ".jpeg", ".png")  # реални снимки; пропускаме .svg/.pdf/.tif (рисунки/схеми)
+
+
+def _get(url, **params):
+    r = requests.get(url, params=params or None,
+                     headers={"User-Agent": USER_AGENT}, timeout=40)
     r.raise_for_status()
-    return r.json()
+    return r
+
+
+def api(wiki, params):
+    return _get(f"https://{wiki}.wikipedia.org/w/api.php",
+                **dict(params, format="json")).json()
 
 
 def commons_api(params):
-    url = "https://commons.wikimedia.org/w/api.php"
-    params = dict(params, format="json")
-    r = requests.get(url, params=params, headers={"User-Agent": USER_AGENT}, timeout=30)
-    r.raise_for_status()
-    return r.json()
+    return _get("https://commons.wikimedia.org/w/api.php",
+                **dict(params, format="json")).json()
 
 
-def lead_image_title(wiki, title):
-    """Връща името на водещия файл (File:...) на статията."""
-    data = api(wiki, {
-        "action": "query", "prop": "pageimages",
-        "piprop": "name", "titles": title,
-    })
-    pages = data.get("query", {}).get("pages", {})
-    for p in pages.values():
-        name = p.get("pageimage")
-        if name:
-            return "File:" + name
-    return None
+def _file_from_url(u):
+    """От upload URL вади името File:... (последната част, декодирана)."""
+    from urllib.parse import unquote
+    name = unquote(u.split("/")[-1])
+    # маха евентуален thumb префикс "NNNpx-"
+    name = re.sub(r"^\d+px-", "", name)
+    return "File:" + name
+
+
+def candidates(wiki, title, override_file):
+    """Връща подредени кандидат-файлове (File:...) за вида, снимки преди рисунки."""
+    out = []
+    if override_file:
+        out.append(override_file if override_file.startswith("File:") else "File:" + override_file)
+
+    # 1) Wikipedia REST summary — водещата снимка от таксобокса (точният вид)
+    try:
+        r = _get(f"https://{wiki}.wikipedia.org/api/rest_v1/page/summary/"
+                 + requests.utils.quote(title, safe=""))
+        j = r.json()
+        for key in ("originalimage", "thumbnail"):
+            src = (j.get(key) or {}).get("source")
+            if src:
+                out.append(_file_from_url(src))
+    except Exception:
+        pass
+
+    # 2) Wikidata P18 — официалната снимка на таксона
+    try:
+        pp = api(wiki, {"action": "query", "prop": "pageprops",
+                        "titles": title, "ppprop": "wikibase_item"})
+        qid = None
+        for p in pp.get("query", {}).get("pages", {}).values():
+            qid = (p.get("pageprops") or {}).get("wikibase_item")
+        if qid:
+            wd = _get("https://www.wikidata.org/w/api.php", action="wbgetclaims",
+                      entity=qid, property="P18", format="json").json()
+            for c in wd.get("claims", {}).get("P18", []):
+                fn = c["mainsnak"]["datavalue"]["value"]
+                out.append("File:" + fn)
+    except Exception:
+        pass
+
+    # 3) pageimages (резерв)
+    try:
+        data = api(wiki, {"action": "query", "prop": "pageimages",
+                          "piprop": "name", "titles": title})
+        for p in data.get("query", {}).get("pages", {}).values():
+            if p.get("pageimage"):
+                out.append("File:" + p["pageimage"])
+    except Exception:
+        pass
+
+    # подреждане: реални снимки (raster) първо, без дубликати
+    seen, raster, other = set(), [], []
+    for f in out:
+        if f in seen:
+            continue
+        seen.add(f)
+        (raster if f.lower().endswith(RASTER) else other).append(f)
+    return raster + other
 
 
 def image_info(file_title):
@@ -126,29 +179,31 @@ def main():
     photos = {}
     total = 0
     for pid, spec in SPECIES.items():
+        got = False
         try:
-            file_title = spec.get("file")
-            if not file_title:
-                file_title = lead_image_title(spec["wiki"], spec["title"])
-            if not file_title:
-                print(f"  ✗ {pid}: не намерих снимка за {spec['title']}")
+            cands = candidates(spec["wiki"], spec["title"], spec.get("file"))
+            if not cands:
+                print(f"  \u2717 {pid}: нямам кандидат за {spec['title']}")
                 continue
-            url, artist, lic, page = image_info(file_title if file_title.startswith("File:") else "File:" + file_title)
-            if not url:
-                print(f"  ✗ {pid}: няма URL за {file_title}")
-                continue
-            data_uri, nbytes = fetch_and_encode(url)
-            photos[pid] = {
-                "src": data_uri,
-                "credit": artist,
-                "license": lic,
-                "source": page,
-            }
-            total += nbytes
-            print(f"  ✓ {pid}: {spec['title']}  ({nbytes // 1024} KB)  — {artist}, {lic}")
-            time.sleep(0.5)  # учтивост към Wikimedia
+            for file_title in cands:
+                try:
+                    url, artist, lic, page = image_info(file_title)
+                    if not url:
+                        continue
+                    data_uri, nbytes = fetch_and_encode(url)
+                    photos[pid] = {"src": data_uri, "credit": artist,
+                                   "license": lic, "source": page}
+                    total += nbytes
+                    print(f"  \u2713 {pid}: {spec['title']}  ({nbytes // 1024} KB)  \u2014 {artist[:45]}, {lic}")
+                    got = True
+                    break
+                except Exception:
+                    continue
+            if not got:
+                print(f"  \u2717 {pid}: нито един кандидат не се свали за {spec['title']}")
+            time.sleep(0.5)
         except Exception as e:
-            print(f"  ✗ {pid}: грешка — {e}")
+            print(f"  \u2717 {pid}: грешка \u2014 {e}")
 
     if not photos:
         sys.exit("Не свалих нито една снимка — прекратявам без промяна на HTML.")
