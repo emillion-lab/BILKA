@@ -9,6 +9,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: fetch-images
+  cancel-in-progress: false
+
 jobs:
   fetch:
     runs-on: ubuntu-latest
@@ -18,10 +22,11 @@ jobs:
       - name: Download images from Wikipedia
         run: python3 fetch_images.py
 
-      - name: Commit images
+      - name: Commit images and log
         run: |
           git config user.name "bilka-bot"
           git config user.email "actions@github.com"
-          git add img/
+          git pull --rebase || true
+          git add img/ fetch_log.txt
           git diff --staged --quiet || git commit -m "Add herb images from Wikipedia"
           git push
