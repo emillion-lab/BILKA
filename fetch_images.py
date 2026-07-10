@@ -22,6 +22,11 @@ PLANTS = {
     "rezene": "Fennel", "cheren-oman": "Symphytum officinale",
     "varbova-kora": "Salix alba", "borovinka": "Vaccinium myrtillus",
     "hvoyna": "Juniperus communis",
+    "orehovi-lista": "Juglans regia", "tikveno-seme": "Cucurbita pepo",
+    "tuchenitsa": "Portulaca oleracea", "treven-zdravets": "Geranium macrorrhizum",
+    "rigan": "Oregano", "isop": "Hyssopus officinalis",
+    "komuniga": "Melilotus officinalis", "sporezh": "Solidago virgaurea",
+    "byal-oman": "Inula helenium",
 }
 
 UA = {"User-Agent": "BILKA-herb-guide/1.0 (https://github.com/emillion-lab/BILKA; contact via repo issues)"}
