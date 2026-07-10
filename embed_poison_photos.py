@@ -54,9 +54,9 @@ USER_AGENT = "BILKA-herbal/1.0 (https://github.com/emillion-lab/BILKA; education
 SPECIES = {
     "ludo-bile":        {"wiki": "en", "title": "Atropa belladonna"},
     "tatul":            {"wiki": "en", "title": "Datura stramonium"},
-    "blyan":            {"wiki": "en", "title": "Hyoscyamus niger"},
+    "blyan":            {"wiki": "en", "title": "Hyoscyamus niger", "file": "Hyoscyamus niger 0002.JPG"},
     "buchinish":        {"wiki": "en", "title": "Conium maculatum"},
-    "voden-buchinish":  {"wiki": "en", "title": "Cicuta virosa"},
+    "voden-buchinish":  {"wiki": "en", "title": "Cicuta virosa", "file": "Cicuta virosa 001.JPG"},
     "naprastnik":       {"wiki": "en", "title": "Digitalis purpurea"},
     "momina-salza":     {"wiki": "en", "title": "Convallaria majalis"},
     "esenen-minzuhar":  {"wiki": "en", "title": "Colchicum autumnale"},
