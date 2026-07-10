@@ -169,6 +169,34 @@ main{max-width:680px;margin:0 auto;padding:.9rem .9rem 4rem}
 .recipe p{white-space:pre-line}
 .warn{background:var(--warn-bg);border:1.5px solid #E3B8B5;border-radius:14px;padding:.9rem 1rem}
 .warn h4{color:var(--red)}
+
+/* Отровни растения — червена предупредителна тема */
+.tab.danger{flex:0 0 auto;padding:.55rem .8rem;border-color:var(--red);color:var(--red)}
+.tab.danger.active{background:var(--red);color:#fff}
+.poison-note{
+  background:var(--warn-bg);border:1.5px solid #E3B8B5;border-left:5px solid var(--red);
+  border-radius:12px;padding:.85rem 1rem;margin-bottom:.9rem;font-size:.95rem;
+}
+.poison-note b{color:var(--red)}
+.poison-card{
+  display:flex;gap:.8rem;align-items:flex-start;
+  background:var(--warn-bg);border:1.5px solid #E3B8B5;border-left:5px solid var(--red);
+  border-radius:14px;padding:.85rem .9rem;margin-bottom:.7rem;cursor:pointer;
+}
+.poison-card .skull{font-size:1.6rem;line-height:1;flex:0 0 auto;margin-top:.1rem}
+.poison-card .pthumb{width:64px;height:64px;object-fit:cover;border-radius:10px;flex:0 0 auto;border:1px solid #E3B8B5}
+.photo-credit{font-size:.72rem;color:#8a7a6a;text-align:right;margin:-.4rem 0 .6rem;opacity:.85}
+.poison-card h3{font-size:1.08rem;color:var(--red)}
+.poison-card .lat{font-style:italic;color:#8a6a3a;font-size:.85rem;margin:.05rem 0 .25rem}
+.poison-card .why{font-size:.92rem}
+.dbadge{
+  display:inline-block;background:var(--red);color:#fff;font-size:.78rem;font-weight:700;
+  padding:.2rem .6rem;border-radius:999px;margin-bottom:.4rem;letter-spacing:.02em;
+}
+.section.danger{background:var(--warn-bg);border:1.5px solid #E3B8B5;border-left:5px solid var(--red);border-radius:14px;padding:.9rem 1rem}
+.section.danger h4{color:var(--red)}
+.section.confuse{background:#FFF7E8;border:1.5px solid #EAD9A6;border-left:5px solid var(--gold);border-radius:14px;padding:.9rem 1rem}
+.section.confuse h4{color:var(--gold)}
 .tagrow{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.8rem}
 .tag{background:#EEF2E6;color:var(--green-dark);border-radius:999px;padding:.25rem .7rem;font-size:.82rem;font-weight:600;border:none;cursor:pointer}
 .tag:hover{background:var(--green);color:#fff}
@@ -214,6 +242,7 @@ body.big{--fs:21px}
   <div class="tabs">
     <button class="tab active" id="tabHerbs">🌿 Билки</button>
     <button class="tab" id="tabAils">🤒 Оплаквания</button>
+    <button class="tab danger" id="tabPoison" title="Отровни растения">☠️</button>
     <button class="tab fav" id="tabFavs" title="Любими">★</button>
     <button class="fontbtn" id="fontbtn" title="По-едри букви" aria-label="По-едри букви">А+</button>
   </div>
@@ -620,6 +649,87 @@ const AILMENTS = [
 {k:"паразити", t:"Паразити (народна употреба)", d:"Народни средства за прочистване. При съмнение за паразити първо направете изследване — тези билки не заместват насочено лечение.", icon:"🪱"}
 ];
 
+// ================= ОТРОВНИ РАСТЕНИЯ =================
+// Тези НЕ са билки за домашна употреба. Показват се само за разпознаване и предупреждение.
+// danger: колко е сериозно; what: защо е опасно; confuse: с какво се бърка; signs: признаци на отравяне
+const POISON = [
+{id:"ludo-bile", n:"Лудо биле (Беладона)", lat:"Atropa belladonna", folk:"старо биле, вранче",
+ danger:"Смъртоносно отровно — цялото растение.",
+ what:"Съдържа атропин и скополамин. Лъскавите черни плодове изглеждат апетитни, но само няколко са опасни за дете. Не бива да влиза в дома под никаква форма.",
+ confuse:"Черните плодове се бъркат с боровинки или горски плодове — най-често от деца.",
+ signs:["разширени зеници и замъглено зрение","суха, зачервена кожа и уста","ускорен пулс","обърканост, халюцинации, възбуда","при тежко отравяне — гърчове"]},
+
+{id:"tatul", n:"Татул", lat:"Datura stramonium", folk:"див тютюн, гламула",
+ danger:"Силно отровно — цялото растение, особено семената.",
+ what:"Расте като плевел из дворове, сметища и градини. Съдържа същите отрови като лудото биле. Опасно е дори вдишването на дим при горене.",
+ confuse:"Бодливите шушулки и едрите семена привличат децата.",
+ signs:["сухота в устата и жажда","разширени зеници","силна обърканост и халюцинации","ускорен пулс","висока температура"]},
+
+{id:"blyan", n:"Черен блян", lat:"Hyoscyamus niger", folk:"попадийка, свинска въшка",
+ danger:"Силно отровно — цялото растение.",
+ what:"Мръсно-жълти цветове с лилави жилки и неприятна миризма. Съдържа атропин и скополамин. В миналото е причинявало масови отравяния — няма място край дома.",
+ confuse:"Младите листа и корените понякога се бъркат с ядливи растения.",
+ signs:["сухота в устата","разширени зеници","обърканост и сънливост","ускорен пулс","халюцинации"]},
+
+{id:"buchinish", n:"Бучиниш (петнист)", lat:"Conium maculatum",
+ danger:"Смъртоносно отровно — цялото растение.",
+ what:"Кухо стъбло с червено-виолетови петна и миризма на миши изпражнения. Отровата (кониин) парализира дишането. Именно с него е отровен Сократ.",
+ confuse:"Лесно се бърка с магданоз, копър, ким и дива морква — най-опасната грешка при бране.",
+ signs:["изтръпване и слабост в крайниците","гадене и повръщане","затруднено дишане","парализа, започваща от краката","спиране на дишането"]},
+
+{id:"voden-buchinish", n:"Воден бучиниш (цикута)", lat:"Cicuta virosa", folk:"водно бучело",
+ danger:"Едно от най-отровните растения у нас — смъртоносно.",
+ what:"Расте край води и мочурища. Кухият корен мирише на целина и е най-отровната част. Дори малко количество причинява тежки гърчове.",
+ confuse:"Коренът се бърка с целина, пащърнак или репички.",
+ signs:["скоро след поглъщане — силни гърчове","пяна на устата","гадене и повръщане","загуба на съзнание"]},
+
+{id:"naprastnik", n:"Напръстник", lat:"Digitalis",
+ danger:"Смъртоносно отровно — действа върху сърцето.",
+ what:"Красиви напръстниковидни цветове. Съдържа сърдечни гликозиди, които разстройват ритъма на сърцето. Отглежда се като градинско цвете, но е опасно.",
+ confuse:"Листата преди цъфтеж се бъркат със зарасличе, гъшarnika и други билкови листа.",
+ signs:["гадене, повръщане, коремни болки","нарушен и забавен пулс","замъглено или жълто-зелено виждане","обърканост","при тежко — спиране на сърцето"]},
+
+{id:"momina-salza", n:"Момина сълза", lat:"Convallaria majalis", folk:"момкова сълза",
+ danger:"Силно отровно — цялото растение, включително водата във вазата.",
+ what:"Ароматните бели камбанки са красиви, но съдържат сърдечни отрови, подобни на напръстника. Всяка година има отравяния при бъркане на листата.",
+ confuse:"Листата преди цъфтеж се бъркат с мечи лук (левурда) и с черемша при бране за салата.",
+ signs:["гадене и повръщане","коремни болки и диария","забавен, неравномерен пулс","замайване","нарушение на сърдечния ритъм"]},
+
+{id:"esenen-minzuhar", n:"Есенен минзухар", lat:"Colchicum autumnale", folk:"циклама, гологлавче",
+ danger:"Смъртоносно отровно — цялото растение.",
+ what:"Разцъфва наесен с бледолилави цветове без листа. Съдържа колхицин — отрова без противоотрова, с коварно забавено действие след часове.",
+ confuse:"Листата напролет се бъркат с мечи лук; луковицата — с лук; цветът — с шафран.",
+ signs:["часове по-късно — парене в устата и гърлото","силно повръщане и водниста диария","обезводняване","отказ на органи след 1–2 дни"]},
+
+{id:"samakitka", n:"Самакитка (Аконит)", lat:"Aconitum", folk:"вълчи корен, калугерка",
+ danger:"Едно от най-силните растителни отрови — смъртоносно.",
+ what:"Тъмносини шлемовидни цветове. Отровата (аконитин) прониква дори през кожата. Достатъчен е малко корен, за да убие възрастен човек.",
+ confuse:"Коренът се бърка с хрян или репички; цветята се берат за букети.",
+ signs:["изтръпване и парене на устата и езика","мравучкане по кожата","гадене и повръщане","нарушен сърдечен ритъм","затруднено дишане"]},
+
+{id:"chemerika", n:"Чемерика (бяла)", lat:"Veratrum album", folk:"кукуряк планински, чемерига",
+ danger:"Силно отровно — цялото растение, особено коренът.",
+ what:"Едри нагънати листа и висок цветонос в планините. Използвана е народно като „лек“, но е тежка отрова за сърцето и стомаха.",
+ confuse:"Коренът се бърка с корен от жълта тинтява (горчивка) при домашно приготвяне на ракия и настойки — класическа причина за отравяния.",
+ signs:["парене в устата, слюноотделяне","упорито повръщане","силно забавен пулс и ниско кръвно","замайване, изпотяване, изстиване"]},
+
+{id:"tis", n:"Тис (отровен)", lat:"Taxus baccata", folk:"негной, отровачка",
+ danger:"Смъртоносно отровно — иглите и семето (не червената обвивка).",
+ what:"Иглолистно дърво или жив плет в паркове и дворове. Съдържа таксин, който спира сърцето. Няма ефективна противоотрова.",
+ confuse:"Червените месести „плодове“ привличат деца; иглите се бъркат с други иглолистни за чай.",
+ signs:["гадене и коремни болки","замайване","нарушен и забавящ се пулс","внезапно спиране на сърцето"]},
+
+{id:"kukuryak", n:"Кукуряк", lat:"Helleborus", folk:"смок, зимниче",
+ danger:"Отровно — цялото растение.",
+ what:"Ранопролетно цвете, което народната традиция погрешно смята за „лечебно“. Дразни силно кожата и лигавиците и разстройва сърцето. Не е за домашно лечение.",
+ confuse:"Народни рецепти го препоръчват вътрешно — точно това е опасно.",
+ signs:["парене в устата и гърлото","силно повръщане и диария","забавен, неравномерен пулс","замайване"]}
+];
+
+// Вградени снимки на отровните растения (base64). Попълва се от embed_poison_photos.py.
+// Формат: { "id": {src:"data:image/jpeg;base64,...", credit:"Автор", license:"CC BY-SA 4.0", source:"URL"} }
+window.POISON_PHOTOS = window.POISON_PHOTOS || {};
+
 // ================= ЛОГИКА =================
 const $=id=>document.getElementById(id);
 const results=$("results"), detail=$("detail"), listview=$("listview"),
@@ -699,6 +809,67 @@ function renderToday(){
   </div>`;
 }
 
+function poisonPhoto(p){
+  return (window.POISON_PHOTOS && window.POISON_PHOTOS[p.id]) || null;
+}
+function poisonImg(p,cls){
+  const ph=poisonPhoto(p);
+  const src = ph ? ph.src : `img/${p.id}.jpg`;
+  return `<img class="${cls}" src="${src}" alt="${esc(p.n)}" loading="lazy" onerror="this.style.display='none'">`;
+}
+
+function poisonCard(p,i,q){
+  const ph=poisonPhoto(p);
+  return `<div class="poison-card" role="button" tabindex="0" onclick="openPoison(${i})" onkeydown="if(event.key==='Enter')openPoison(${i})">
+    ${ph?`<img class="pthumb" src="${ph.src}" alt="${esc(p.n)}" loading="lazy">`:`<div class="skull" aria-hidden="true">☠️</div>`}
+    <div>
+      <h3>${hl(p.n,q)}</h3>
+      <div class="lat">${hl(p.lat,q)}${p.folk&&p.folk!=="—"?" · нар. "+hl(p.folk,q):""}</div>
+      <div class="why">${hl(p.danger,q)}</div>
+    </div>
+  </div>`;
+}
+
+const POISON_INTRO=`<div class="poison-note"><b>☠️ Тези растения не са билки.</b> Изброени са само за разпознаване. <b>Не се използват за чай, компрес или ракия под никаква форма.</b> При съмнение за отравяне — веднага <b>звъннете на 112</b> (Клиника по токсикология „Пирогов“). Не предизвиквайте повръщане без указание.</div>`;
+
+function openPoison(i){
+  const p=POISON[i];
+  const prev=(i-1+POISON.length)%POISON.length, next=(i+1)%POISON.length;
+  detail.innerHTML=`
+    <div class="dtop">
+      <button class="backbtn" onclick="closeDetail()">← Назад</button>
+    </div>
+    ${poisonImg(p,"dphoto")}
+    ${(function(){const ph=poisonPhoto(p);return ph&&ph.credit?`<div class="photo-credit">Снимка: ${esc(ph.credit)}${ph.license?" · "+esc(ph.license):""}</div>`:"";})()}
+    <div class="dhead">
+      <div class="dbadge">☠️ ОТРОВНО — НЕ ЗА УПОТРЕБА</div>
+      <h2 class="serif">${p.n}</h2>
+      <div class="lat">${p.lat}</div>
+      ${p.folk&&p.folk!=="—"?`<div class="folk">Народни имена: ${p.folk}</div>`:""}
+    </div>
+    <div class="section danger">
+      <h4>Защо е опасно</h4>
+      <p>${p.what}</p>
+    </div>
+    <div class="section confuse">
+      <h4>С какво се бърка</h4>
+      <p>${p.confuse}</p>
+    </div>
+    <div class="section">
+      <h4>Признаци на отравяне</h4>
+      <ul>${p.signs.map(s=>`<li>${s}</li>`).join("")}</ul>
+    </div>
+    <div class="poison-note" style="margin-top:.9rem">При подозрение за отравяне — <b>112</b>. Ако е възможно, покажете растението на медиците.</div>
+    <div class="navrow">
+      <button onclick="openPoison(${prev})">← ${POISON[prev].n}</button>
+      <button onclick="openPoison(${next})">${POISON[next].n} →</button>
+    </div>
+  `;
+  listview.style.display="none";
+  detail.style.display="block";
+  window.scrollTo({top:0});
+}
+
 function render(){
   const q=norm(search.value);
   clearbtn.style.display=q?"block":"none";
@@ -711,8 +882,13 @@ function render(){
       return hay.includes(q);
     });
     const ailHits=AILMENTS.filter(a=>norm(a.t+" "+a.k+" "+a.d).includes(q));
+    const poisonHits=POISON.map((p,i)=>({p,i})).filter(({p})=>{
+      const hay=norm([p.n,p.lat,p.folk,p.danger,p.what,p.confuse].join(" "));
+      return hay.includes(q);
+    });
     let html="";
     if(ailHits.length) html+=ailHits.map(a=>ailCard(a,true)).join("");
+    if(poisonHits.length) html+=POISON_INTRO+poisonHits.map(({p,i})=>poisonCard(p,i,q)).join("");
     if(hits.length) html+=hits.map(({h,i})=>herbCard(h,i,q)).join("");
     results.innerHTML=html||`<div class="empty">Нищо не е намерено за „${esc(search.value)}“.<br>Опитайте с друга дума — например „кашлица“, „стомах“ или „лайка“.</div>`;
     count.textContent=hits.length?`Намерени билки: ${hits.length}`:"";
@@ -722,6 +898,9 @@ function render(){
   if(mode==="herbs"){
     results.innerHTML=HERBS.map((h,i)=>herbCard(h,i,"")).join("");
     count.textContent=`Билки в справочника: ${HERBS.length}`;
+  }else if(mode==="poison"){
+    results.innerHTML=POISON_INTRO+POISON.map((p,i)=>poisonCard(p,i,"")).join("");
+    count.textContent=`Отровни растения: ${POISON.length}`;
   }else if(mode==="favs"){
     const list=HERBS.map((h,i)=>({h,i})).filter(x=>favs.has(x.h.id));
     results.innerHTML=list.length
@@ -800,10 +979,12 @@ function closeDetail(){
 
 $("tabHerbs").onclick=()=>{mode="herbs";setTabs();search.value="";render()};
 $("tabAils").onclick=()=>{mode="ails";setTabs();search.value="";render()};
+$("tabPoison").onclick=()=>{mode="poison";setTabs();search.value="";render()};
 $("tabFavs").onclick=()=>{mode="favs";setTabs();search.value="";render()};
 function setTabs(){
   $("tabHerbs").classList.toggle("active",mode==="herbs");
   $("tabAils").classList.toggle("active",mode==="ails");
+  $("tabPoison").classList.toggle("active",mode==="poison");
   $("tabFavs").classList.toggle("active",mode==="favs");
 }
 search.addEventListener("input",render);
